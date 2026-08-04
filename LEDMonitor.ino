@@ -4,6 +4,7 @@
 /* Definitions that the User can Change */
 #define PIN 2                            // input pin Neopixel is attached to
 #define DELAY 500                        // delay beetween display updates
+#define BRIGHTNESS 50                    // overall strip brightness (0-255), keep this sane to limit current draw
 #define COLORON display.Color(255,69,0)  // the color a "ON" pixel has
 #define COLOROFF display.Color(47,79,79) // the color a "OFF" pixel has
 
@@ -16,8 +17,8 @@
 /* Create variables */
 Adafruit_NeoPixel display = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
-byte start = 0;           // at what index do we start displaying
-byte finish = WINDOWSIZE; // at what index do we stop displaying
+uint16_t start = 0;           // at what index do we start displaying
+uint16_t finish = WINDOWSIZE; // at what index do we stop displaying
 byte bMask=0;             // the byte mask to transport the data from the bitData[] to the actuall display
 byte bStripIndex=0;       // the index of the led that gets currently writen to
 
@@ -25,7 +26,6 @@ byte bStripIndex=0;       // the index of the led that gets currently writen to
 char originalInput[]={'H','E','L','L','O','W','O','R','L','D'}; // enter the message you want to display
 
 byte bitData[sizeof(originalInput)*5];  // in this array the actuall data will end up
-                                        // the count of char's from the originalInput array times 7 because 6 for the letter and 1 space
 
 /*______________________________________________________________________________________*/
 /* Declare functions */
@@ -36,13 +36,14 @@ void vSetLed(byte index, bool state); // the led at pos x while be set to on or 
 /*______________________________________________________________________________________*/
 /* Implement functions */
 void setup() {
-  
+
+  Serial.begin(9600); 
   vInitData();
   display.begin();
+  display.setBrightness(BRIGHTNESS);
 
   // debug code
-  Serial.begin(9600);
-  for(byte i=0;i<sizeof(originalInput)*7;i++){
+  for(byte i=0;i<sizeof(bitData);i++){
     vPrintBin(bitData[i]);
   }
   // end debug code
@@ -52,7 +53,7 @@ void loop() {
 // one loop is one refresh of the entire display
   bMask=1;        // starting in the first row
   bStripIndex=0;  // starting on the first led
-  
+
   while(bStripIndex<NUMPIXELS){       // loop each led
     for(byte i=start;i<finish;i++){   // loop inside of row number X
       vSetLed(bStripIndex++, bitData[i] & bMask);
@@ -62,14 +63,14 @@ void loop() {
       vSetLed(bStripIndex++, bitData[i] & bMask);
     }
     bMask = bMask << 1;               // shifting Mask to next row X+2 or X for the next loop in while
-  } 
+  }
   finish++;   //Shifting the window on space over
   start++;
   if(finish==sizeof(bitData)){
     start=0;
     finish=WINDOWSIZE;
   }
-  
+
   display.show();
   delay(DELAY);
 }
@@ -92,7 +93,7 @@ void vSetLed(byte index, bool state){
 void vInitData(){
   int dataIndex=0;
   for(int i=0;i<sizeof(originalInput);i++){
-  
+
     switch(originalInput[i]){
       case 'A':
         bitData[dataIndex++]=0b111110;
@@ -257,9 +258,14 @@ void vInitData(){
         bitData[dataIndex++]=0b101001;
         bitData[dataIndex++]=0b000101;
         bitData[dataIndex++]=0b000010;
-        break;      
+        break;
       case ' ':
-        bitData[dataIndex++]=0b000000;
+        // no shape to draw; the trailing separator below already adds the blank column
+        break;
+      default:
+        Serial.print(F("Warning: unsupported character in originalInput: '"));
+        Serial.print(originalInput[i]);
+        Serial.println(F("'"));
         break;
     }
      bitData[dataIndex++]=0b000000;
